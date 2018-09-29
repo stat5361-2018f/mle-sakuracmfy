@@ -1,0 +1,194 @@
+---
+title: "Many Local Maxima and Modeling Beetle Data Problems"
+subtitle: "5361 Homework 4"
+author: Qinxiao Shi ^[<qinxiao.shi@uconn.edu>]
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  bookdown::pdf_document2
+documentclass: article
+papersize: letter
+fontsize: 11pt
+bibliography: Format.bib
+biblio-style: asa
+---
+
+# Many Local Maxima
+## Log-likelihood Function
+The probability density function with parameter $\theta$ is:
+$$f(x;\theta)= \frac{1-\cos(x-\theta)}{2\pi},\space\space 0 \le x \le 2\pi,\space\space \theta \in (-\pi , \pi)$$
+\end{equation*}
+The likelihood function of $f(x;\theta)$ is:
+$$L(\theta)=\frac{\prod_{i=1}^{n}[1-\cos(X_i-\theta)]}{(2\pi)^n}$$
+The log-likelihood function is:
+$$\ell(\theta)=-n\log (2\pi)+\sum_{i=1}^{n}\log[1-\cos(X_i-\theta)]$$
+```{r likelihood, echo=TRUE}
+library("ggplot2")
+set.seed(20180909)
+
+x <- c(3.91, 4.85, 2.28, 4.06, 3.70, 4.04, 5.46, 3.53, 2.28, 1.96,
+       2.53, 3.88, 2.22, 3.47, 4.82, 2.46, 2.99, 2.54, 0.52)
+
+y <- function(theta){
+  y <- 0
+  for (i in 1:length(x)){
+    y <- y-log(2*pi)+log(1-cos(x[i]-theta))
+  }
+  return(y)
+}
+
+ggplot(data.frame(theta=c(-pi,pi)), aes(x=theta))+
+  stat_function(fun = function(theta) y(theta))+
+  ggtitle(expression("Loglikelihood Funciton VS."~theta))+
+  theme(plot.title = element_text(hjust = 0.5))+
+  labs(y="Value of Log-likelihood Funciton", x=expression(theta))
+```
+
+## Method-of-Moments Estimator
+The expectation of $f(x;\theta)$ is:
+\begin{equation*}
+  \begin{split}
+    \mathbb {E} (X \ |\theta)&=\int_{0}^{2\pi} xf(x;\theta)dx \\
+    &=\frac{1}{2 \pi}(\int_{0}^{2\pi}xdx-\int_{0}^{2\pi}x\cos(x-\theta)dx) \\
+    &=\frac{1}{2 \pi}[2\pi^2-(x\sin(x-\theta)\big|_{0}^{2\pi}-\int_{0}^{2\pi}\sin(x-\theta)dx)]\\
+    &=\frac{1}{2 \pi}[2\pi^2-(x\sin(x-\theta)+\cos(x-\theta))\bigg|_{0}^{2\pi}]\\
+    &=\frac{1}{2 \pi}\{ 2\pi^2-[x(\sin(x)\cos(\theta)-\cos(x)\sin(\theta))+\cos(x)\cos(\theta)+\sin(x)\sin(\theta)\bigg|_{0}^{2\pi})]\}\\
+    &=\frac{1}{2 \pi}[2\pi^2+2\pi\sin{\theta}]\\
+    &=\pi+\sin{\theta}
+  \end{split}
+\end{equation*}
+
+So when we do estimation:
+$\bar{X_{n}}=\pi+\sin{\hat\theta}$,  $\tilde{\theta}_{n}=\arcsin(\bar{X_{n}}-\pi)=arcsin(3.2368-\pi)=0.0954$
+
+## Newton–Raphson Method For MLE
+The gradient is:
+$$\ell^\prime(\theta)=\sum_{i=1}^{n}\frac{-\sin(X_i-\theta)}{1-\cos(X_i-\theta)}$$
+The hessian is:
+\begin{equation*}
+  \begin{split}
+  \ell^{\prime\prime}(\theta)&=\sum_{i=1}^{n}\frac{-\cos(X_i-\theta)[1-\cos(X_i-\theta)]+[\sin(X_i-\theta)]^2}{[1-\cos(X_i-\theta)]^2}\\
+  &=\sum_{i=1}^{n}\frac{-\cos(X_i-\theta)+1}{[1-\cos(X_i-\theta)]^2}\\
+  &=\sum_{i=1}^{n}\frac{1}{1-\cos(X_i-\theta)}
+  \end{split}
+\end{equation*}
+
+```{r MLE, echo=TRUE, warning=FALSE}
+library("pracma")
+library("pander")
+library("gridExtra")
+library("grid")
+library("knitr")
+library("kableExtra")
+
+gradient <- function(theta){
+    gradient <- sum(-sin(x-theta)/(1-cos(x-theta)))
+  return(gradient)
+}
+
+hessian <- function(theta){
+    hessian <- sum(1/(cos(x-theta)-1))
+  return(hessian)
+}
+
+theta0 <- asin(mean(x)-pi)
+
+newton1 <- newtonRaphson(fun=function(theta) gradient(theta), x0=theta0,
+                         dfun=function(theta) hessian(theta))
+  root1 <- newton1$root
+  
+table1 <- data.frame(Theta=theta0, Root=root1)
+
+kable(table1, booktabs = TRUE, align = 'c', row.names = 1)
+
+
+```
+So the $MLE$ for $\theta$ using the Newton-Raphson method with initial value $\theta_0=\tilde\theta_n$ is $0.0031$.
+
+## Find MLE at $\theta_0=\pm2.7$
+```{r IA, echo=TRUE, warning=FALSE}
+theta2 <- c(-2.7, 2.7)
+newton2 <- vector("list", length = length(theta2))
+root2 <- array(NA, dim=length(theta2))
+for (i in 1:length(theta2)){
+  newton2[[i]] <- newtonRaphson(fun=function(theta) gradient(theta), 
+                              dfun=function(theta) hessian(theta), x0=theta2[i])
+  root2[i] <- newton2[[i]]$root
+}
+
+table2 <- data.frame(Theta=theta2, Root=root2)
+kable(table2, booktabs = TRUE, align = 'c', row.names = 1)
+```
+So the $MLE$ for $\theta$ at $\theta_0=-2.7$ is $-2.6689$, and the $MLE$ at $\theta_0=2.7$ is $2.8484$.
+
+## 200 Values Optimization Between $-\pi$ and $\pi$
+```{r optimization, echo=TRUE, warning=FALSE}
+dff <- 2*pi/199
+theta3 <- array(-pi, dim = 200)
+for (i in 2:200)
+  theta3[i] <- theta3[as.numeric(i-1)]+dff
+
+newton3 <- vector("list", length = length(theta3))
+root3 <- array(NA, dim=length(theta3))
+
+for (i in 1:length(theta3)){
+  newton3[[i]] <- newtonRaphson(fun=function(theta) gradient(theta), 
+                              dfun=function(theta) hessian(theta), x0=theta3[i])
+  root3[i] <- newton3[[i]]$root
+}
+  table3 <- data.frame(Theta=theta3, Root=root3)
+  
+temp <- as.data.frame(table(table3$Root))
+mult.group <- vector("list", length(temp$Freq))
+pos <- 0
+
+for (i in 1:length(temp$Freq)) {
+  for (j in 1:temp$Freq[i]){
+  mult.group [[i]][j] <- table3$Theta[pos + j]
+  }
+  pos <- pos + temp$Freq[i]
+}
+```
+
+So the group of initial value, whose local maximam are the same, should be:
+```{r result, echo=TRUE, warning=FALSE}
+print(mult.group)
+  
+  ggplot(table3, aes(x = theta3, y = root3)) + 
+    geom_point()+
+    ggtitle("Local Maximam VS."~theta)+
+    theme(plot.title = element_text(hjust = 0.5))+
+    labs(y="Local Maximam Value", x=expression(theta))
+```
+
+# Modeling Beetle Data
+## Population Growth Model - Gauss-Newton Approach
+```{r model, echo=TRUE, warning=FALSE}
+beetles <- data.frame(
+    days    = c(0,  8,  28,  41,  63,  69,   97, 117,  135,  154),
+    beetles = c(2, 47, 192, 256, 768, 896, 1120, 896, 1184, 1024))
+
+bt <- list(
+t <- beetles$days,
+y <- beetles$beetles
+)
+
+fo <- y~2*K/(2+(K-2)*exp(-r*t))
+nls(fo, data=bt, start = list(K=1000, r=1))
+```
+The fitted model should be:
+$$f(t)=\frac{2098.8136}{2+1047.4068\exp(-0.1183t)}$$
+where the minimized sum of squared error should be $73420$
+
+```{r contour, echo=TRUE, warning=FALSE}
+K <- seq(500, 1500, by=5)
+r <- seq(0, 1, by=0.005)
+
+
+z <- matrix(NA, nrow = 201, ncol = 201)
+for (i in 1:201){
+  for (j in 1:201){
+    z[i, j] <- sum((y-2*K[i]/(2+(K[i]-2)*exp(-r[j]*t)))^2)
+  }
+}
+contour(K, r, z, xlab = "r", ylab = "K")
+```
